@@ -131,53 +131,142 @@ def dump():
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{v["title"]} | pa-f</title>
     <style>
-        body {{ font-family: sans-serif; margin: 0; background: #eee; }}
-        .container {{ display: flex; flex-direction: column; min-height: 100vh; }}
-        header {{ background: #333; color: white; padding: 0.5rem 1rem; text-align: center; }}
-        header h1 {{ margin: 0.5rem; }}
-        .main-area {{ display: flex; flex: 1; }}
-        nav {{ width: 250px; background: #f4f4f4; padding: 1rem; order: 1; }}
-        main {{ flex: 1; padding: 1rem; order: 2; background: #fff;}}
-        aside {{ width: 250px; background: #f4f4f4; padding: 1rem; order: 3; }}
-
+        * {{
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: sans-serif;
+            margin: 0;
+        }}
+        .page-wrapper {{
+            display: flex;
+        }}
+        .left-sidebar {{
+            width: 325px;
+            flex-shrink: 0;
+        }}
+        .logo-container img {{
+            width: 100%;
+            height: auto;
+            display: block;
+        }}
+        main {{
+            flex-grow: 1;
+            padding: 1rem;
+        }}
+        aside {{
+            width: 250px;
+            flex-shrink: 0;
+            padding: 1rem;
+        }}
+        
         nav ul, aside ul {{ list-style: none; padding: 0; }}
         nav ul li a, aside ul li a {{ text-decoration: none; color: #333; display: block; padding: 0.2rem 0; }}
+        nav {{ padding: 1rem; }}
+
+        .attendees-mobile {{ display: none; }}
+
+        footer {{
+            text-align: center;
+            font-weight: bold;
+            padding: 1rem;
+        }}
+
+        .hamburger {{
+            display: none;
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+            background: #333;
+            color: white;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+        }}
 
         @media (max-width: 800px) {{
-            .main-area {{ flex-direction: column; }}
-            nav, aside {{ width: 100%; border-top: 1px solid #ccc; }}
+            .page-wrapper {{
+                flex-direction: column;
+            }}
+            .left-sidebar, main, aside {{
+                width: 100%;
+            }}
+            .left-sidebar {{ order: 1; }}
+            main {{ order: 2; }}
+            aside {{ order: 3; }}
+            .logo-container {{
+                height: 80px;
+                text-align: center;
+            }}
+            .logo-container img {{
+                height: 100%;
+                width: auto;
+            }}
+            aside {{
+                display: none;
+            }}
+            .left-sidebar nav {{
+                display: none;
+            }}
+            body.show-menu .left-sidebar nav,
+            body.show-menu .attendees-mobile {{
+                display: block;
+            }}
+            .hamburger {{
+                display: block;
+            }}
         }}
     </style>
 </head>
 <body>
-    <div class="container">
-        <header><h1>PAF</h1></header>
-        <div class="main-area">
+    <button class="hamburger" onclick="toggleMenu()">&#9776;</button>
+    <div class="page-wrapper">
+        <div class="left-sidebar">
+            <div class="logo-container">
+                <a href="{home_path}"><img src="{logo_path}" alt="PAF Logo"></a>
+            </div>
             <nav>
-                <a href="{home_path}"><img src="{logo_path}" /></a>
+                <h2>Navigation</h2>
                 <ul>
                     <li><a href="/index.html">Home</a></li>
                     <li><a href="/about.html">About</a></li>
                     <li><a href="/contact.html">Contact</a></li>
                 </ul>
-            </nav>
-            <main>
-                <h2>{v["title"]}</h2>
-                <div id="date">{v.get("date", "")}</div>
-                <div id="main-content">
-                    {markdown(v["md"])}
+                <div class="attendees-mobile">
+                    <h3>Attendees</h3>
+                    <ul>
+                        <li>Attendee 1</li>
+                        <li>Attendee 2</li>
+                        <li>Attendee 3</li>
+                    </ul>
                 </div>
-            </main>
-            <aside>
-                <h3>Attendees</h3>
-                <ul>
-                    <li>Attendee 1</li>
-                    <li>Attendee 2</li>
-                    <li>Attendee 3</li>
-                </ul>
-            </aside>
+            </nav>
         </div>
+        <main>
+            <h2>{v["title"]}</h2>
+            <div id="date">{v.get("date", "")}</div>
+            <div id="main-content">
+                {markdown(v["md"])}
+            </div>
+        </main>
+        <aside>
+            <h3>Attendees</h3>
+            <ul>
+                <li>Attendee 1</li>
+                <li>Attendee 2</li>
+                <li>Attendee 3</li>
+            </ul>
+        </aside>
     </div>
+    <footer>
+        Performing Arts Forum - 15, rue Haute 02820 St Erme Outre et Ramecourt - France | Association Loi 1901 SIRET : 499 353 001 000 13
+    </footer>
+    <script>
+        function toggleMenu() {{
+            document.body.classList.toggle('show-menu');
+        }}
+    </script>
 </body>
 </html>"""
 
