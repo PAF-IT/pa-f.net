@@ -5,10 +5,11 @@ name = "pypi"
 
 [packages]
 bs4 = "*"
+markdownify = "*"
+markdown = "*"
 
 [dev-packages]
 ipython = "*"
 
 [requires]
 python_version = "3.13"
-python_full_version = "3.13.3"
