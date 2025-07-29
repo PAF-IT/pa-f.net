@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "6943d9d3840de7481eba607be8b39712ce1e181f78636d0608be59fb3f20b86f"
+            "sha256": "83d7d748c905c9be66b362bb201672e5cb4f15efd783b99c131ca361a0900d41"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -48,6 +48,10 @@
             ],
             "index": "pypi",
             "version": "==1.1.0"
+        },
+        "palimpsest": {
+            "editable": true,
+            "file": "."
         },
         "six": {
             "hashes": [

@@ -7,6 +7,7 @@ name = "pypi"
 bs4 = "*"
 markdownify = "*"
 markdown = "*"
+palimpsest = {file = ".", editable = true}
 
 [dev-packages]
 ipython = "*"
