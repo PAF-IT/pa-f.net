@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 from markdown import markdown
 from markdownify import MarkdownConverter
 import re
+import random
 
 import os
 
@@ -54,6 +55,8 @@ def parse():
 
             links = list(set([X['href'].split("https://pa-f.net")[-1].split("http://pa-f.net")[-1].split("http://www.pa-f.net")[-1] for X in soup.select('a') if X.get("href") and not X['href'].startswith("mailto:")]))
 
+            image = False
+
             content_md = ""
 
             if len(soup.select(".node .content")) > 1:
@@ -69,9 +72,15 @@ def parse():
                 if content:
                     content_md = md(content)
 
+                    if len(content.select('img')) == 1:
+                        image = content.select_one('img').get("src").lstrip("./")
+
             galleries = soup.select_one(".galleries")
 
-            if not (content or galleries):
+            images = soup.select_one(".images")
+            pager = soup.select_one(".pager")
+
+            if not (content or galleries or images):
                 print("no content found for page", path, content)
                 continue
 
@@ -84,21 +93,41 @@ def parse():
                     date = date_match.group()
 
             if galleries:
-                content_md += md(galleries)
+                # some cleanup
+                for el in galleries.select('.count, .last'):
+                    el.decompose()
+
+                content_md += "\n\n" + md(galleries)
+
+            if images:
+                content_md += "\n\n" + md(images)
+            if pager:
+                content_md += "\n\n" + md(pager)
 
 
             #sitemap[my_uid] = {"title": title, "links": links, "md": content_md, "date": date}
-            sitemap[my_uid] = {"title": title, "md": content_md, "date": date}
+            sitemap[my_uid] = {"title": title, "md": content_md, "date": date, "image": image}
 
     json.dump(sitemap, open('sitemap.json', 'w'), indent=2)
     return sitemap
 
 # sitemap = parse()
 
+def markdown2html(md):
+    md = re.sub(r"^\s*\*? (#+)\s*(.*)$", r"\1 \2", md, flags=re.MULTILINE)
+    out = markdown(md, extensions=["extra"])
+    return out
+
 def dump():
     # Reconstruct the PAF site
     OUTDIR = "paf-static"
     os.makedirs(OUTDIR, exist_ok=True)
+
+    # find all images nodes...
+    all_images = []             # page_path, image_path
+    for k,v in sitemap.items():
+        if v.get("image"):
+            all_images.append((k, v['image']))
 
     # Symlink to the scraped images
     im_src_path = os.path.abspath("pa-f.net/sites/pa-f.net/files")
@@ -108,18 +137,38 @@ def dump():
     if not os.path.exists(im_dest_path):
         os.symlink(im_src_path, im_dest_path)
 
+    with open('sidebar.html', 'r') as f:
+        sidebar_content = f.read()
+
     for k,v in sitemap.items():
         os.makedirs(os.path.dirname(os.path.join(OUTDIR, k)), exist_ok=True)
 
         # Construct relative paths to the root
         ROOT = "../" * (len(k.split("/")) - 1)
 
-        # Pick a logo based on nesting depth
+        sidebar_html = sidebar_content.replace("https://pa-f.net/", ROOT)
+
+        # Pick a logo
         logo_names = ["roundtable_logo.png", "paf-yellow.png", "paf-orange.png", "paf-pink.png", "paf-waves.png"]
-        logo_name = logo_names[(len(k.split("/")) - 1) % len(logo_names)]
+        logo_name = random.choice(logo_names)
 
         logo_path = f"{ROOT}sites/pa-f.net/files/{logo_name}"
         home_path = f"{ROOT}index.html"
+
+        # Pick an image
+        im_pagepath, im_path = random.choice(all_images)
+        im_pagepath = ROOT + im_pagepath
+        im_path = ROOT + im_path
+
+        title_html = ""
+        if v["title"] != "pa-f":
+            title_html = f"""
+            <h2>{v["title"]}</h2>
+            """
+            if v.get("date"):
+                title_html += f"""
+            <div id="date">{v.get("date", "")}</div>
+            """
 
         with open(os.path.join(OUTDIR, k), "w") as fh:
             # generate a simple html page
@@ -146,8 +195,6 @@ def dump():
             flex-shrink: 0;
         }}
         .logo-container img {{
-            width: 100%;
-            height: auto;
             display: block;
         }}
         main {{
@@ -159,9 +206,20 @@ def dump():
             flex-shrink: 0;
             padding: 1rem;
         }}
-        
+
+        a {{
+            color: #6cc;
+            text-decoration: none;
+        }}
+        a:hover {{
+            color: black;
+            text-decoration: underline;
+        }}
+        h2 a {{
+            color: black;
+        }}
         nav ul, aside ul {{ list-style: none; padding: 0; }}
-        nav ul li a, aside ul li a {{ text-decoration: none; color: #333; display: block; padding: 0.2rem 0; }}
+        nav ul li a, aside ul li a {{ display: block; padding: 0.2rem 0; }}
         nav {{ padding: 1rem; }}
 
         .attendees-mobile {{ display: none; }}
@@ -174,7 +232,7 @@ def dump():
 
         .hamburger {{
             display: none;
-            position: fixed;
+            position: absolute;
             top: 15px;
             right: 15px;
             z-index: 1000;
@@ -212,6 +270,8 @@ def dump():
             body.show-menu .left-sidebar nav,
             body.show-menu .attendees-mobile {{
                 display: block;
+                background-color: #333;
+                color: white;
             }}
             .hamburger {{
                 display: block;
@@ -224,39 +284,39 @@ def dump():
     <div class="page-wrapper">
         <div class="left-sidebar">
             <div class="logo-container">
-                <a href="{home_path}"><img src="{logo_path}" alt="PAF Logo"></a>
+                <a href="{home_path}"><img width="323" height="319" src="{logo_path}" alt="PAF Logo"></a>
             </div>
             <nav>
-                <h2>Navigation</h2>
                 <ul>
-                    <li><a href="/index.html">Home</a></li>
-                    <li><a href="/about.html">About</a></li>
-                    <li><a href="/contact.html">Contact</a></li>
+                    <li><a href="{home_path}">home</a></li>
+                    <li><a href="{ROOT}node/25153.html">news</a></li>
+                    <li><a href="{ROOT}downloads.html">downloads</a></li>
+                    <li><a href="{ROOT}program.html">events</a></li>
+                    <li><a href="{ROOT}basics.html">basics</a></li>
+                    <li><a href="{ROOT}image.html">galleries</a></li>
+                    <li><a href="{ROOT}basics/directions.html">how to get to PAF</a></li>
+                    <li><a href="{ROOT}node/25189.html">the mattress</a></li>
+                    <li><a href="{ROOT}contacts.html">contact</a></li>
+                    <li><a href="{ROOT}links.html">partners</a></li>
                 </ul>
+            <br />
+            <a href="{im_pagepath}"><img width="100%" src="{im_path}" /></a>
+            <b>
+            PAF is not sponsored or subsidised. PAF is paid for through the residency and membership fees of the about 1100 residents that pass by in a year.
+            </b>
                 <div class="attendees-mobile">
-                    <h3>Attendees</h3>
-                    <ul>
-                        <li>Attendee 1</li>
-                        <li>Attendee 2</li>
-                        <li>Attendee 3</li>
-                    </ul>
+                    {sidebar_html}
                 </div>
             </nav>
         </div>
         <main>
-            <h2>{v["title"]}</h2>
-            <div id="date">{v.get("date", "")}</div>
             <div id="main-content">
-                {markdown(v["md"])}
+                {title_html}
+                {markdown2html(v["md"])}
             </div>
         </main>
         <aside>
-            <h3>Attendees</h3>
-            <ul>
-                <li>Attendee 1</li>
-                <li>Attendee 2</li>
-                <li>Attendee 3</li>
-            </ul>
+            {sidebar_html}
         </aside>
     </div>
     <footer>
