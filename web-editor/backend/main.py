@@ -74,6 +74,10 @@ async def update_sitemap(sitemap_data: dict):
             for field in required_fields:
                 if field not in page_data:
                     raise HTTPException(status_code=400, detail=f"Missing required field '{field}' for page {path}")
+            
+            # Ensure links field exists
+            if 'links' not in page_data:
+                page_data['links'] = []
         
         # Save the updated sitemap
         with open(SITEMAP_PATH, 'w', encoding='utf-8') as f:
@@ -86,7 +90,10 @@ async def update_sitemap(sitemap_data: dict):
         )
         generator.generate_site()
         
-        return {"message": "Sitemap updated and static site regenerated successfully"}
+        return {
+            "message": "Sitemap updated and static site regenerated successfully",
+            "pages_count": len(sitemap_data)
+        }
     
     except HTTPException:
         raise

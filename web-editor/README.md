@@ -11,11 +11,14 @@ A simple web-based editor for the PAF website that allows editing content throug
 ## Features
 
 - Load entire sitemap.json in the browser
-- Sidebar with list of all pages
-- Markdown editor with syntax highlighting
+- **Responsive sidebar** with improved sizing and mobile support
+- **Search functionality** to quickly find pages
+- **Add/remove pages** directly from the interface
+- **Professional WYSIWYG markdown editor** with live preview
 - Edit page titles, dates, and images
 - Save changes and automatically regenerate static site
 - No database required - works directly with JSON files
+- Mobile-friendly responsive design
 
 ## Setup
 
