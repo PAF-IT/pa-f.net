@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import MDEditor from '@uiw/react-md-editor'
-import { Search, Plus, Menu, X, Trash2 } from 'lucide-react'
+import MDEditor, { commands } from '@uiw/react-md-editor'
+import { Search, Plus, Menu, X, Trash2, Link } from 'lucide-react'
+import LinkSearchWidget from './LinkSearchWidget'
 
 interface PageData {
   title: string
@@ -24,6 +25,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showAddPageDialog, setShowAddPageDialog] = useState(false)
   const [newPagePath, setNewPagePath] = useState('')
+  const [editorSelection, setEditorSelection] = useState<{start: number, end: number} | null>(null)
 
   // Load sitemap on component mount
   useEffect(() => {
@@ -159,6 +161,75 @@ function App() {
     setSidebarOpen(!sidebarOpen)
   }
 
+  // Store current selection to preserve it when clicking the custom link button
+  const [currentSelection, setCurrentSelection] = useState<{start: number, end: number} | null>(null)
+
+  // Create custom internal link command for MDEditor toolbar
+  const customInternalLinkCommand = {
+    name: 'internal-link',
+    keyCommand: 'internal-link',
+    buttonProps: { 'aria-label': 'Insert link to internal page', title: 'Insert link to internal page' },
+    icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        <circle cx="12" cy="12" r="1"/>
+      </svg>
+    ),
+    execute: (state: any, api: any) => {
+      // Store current selection before showing the widget
+      const editorTextarea = document.querySelector('.w-md-editor-text-area') as HTMLTextAreaElement
+      if (editorTextarea) {
+        setCurrentSelection({
+          start: editorTextarea.selectionStart,
+          end: editorTextarea.selectionEnd
+        })
+      }
+      
+      // Show our custom link search widget
+      setTimeout(() => {
+        const linkSearchWidget = document.querySelector('.link-search-button') as HTMLButtonElement
+        if (linkSearchWidget) {
+          linkSearchWidget.click()
+        }
+      }, 10)
+    }
+  }
+
+  // Create custom toolbar commands
+  const customCommands = [
+    commands.bold,
+    commands.italic,
+    commands.strikethrough,
+    commands.hr,
+    commands.group([
+      commands.title1,
+      commands.title2,
+      commands.title3,
+      commands.title4,
+      commands.title5,
+      commands.title6,
+    ], {
+      name: 'title',
+      groupName: 'title',
+      buttonProps: { 'aria-label': 'Insert title'}
+    }),
+    commands.divider,
+    commands.link, // Keep original link command for external links
+    customInternalLinkCommand, // Add our custom internal link command
+    commands.quote,
+    commands.code,
+    commands.codeBlock,
+    commands.comment,
+    commands.image,
+    commands.divider,
+    commands.unorderedListCommand,
+    commands.orderedListCommand,
+    commands.checkedListCommand,
+    commands.divider,
+    commands.help,
+  ]
+
   if (loading) {
     return <div className="loading">Loading sitemap...</div>
   }
@@ -291,7 +362,103 @@ function App() {
             </div>
 
             <div className="markdown-editor-container">
-              <label>Content (Markdown):</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                <label style={{ margin: 0 }}>Content (Markdown):</label>
+                <LinkSearchWidget
+                  sitemap={sitemap}
+                  onLinkSelect={(linkMarkdown) => {
+                    // Use stored selection if available, otherwise get current selection
+                    const editorTextarea = document.querySelector('.w-md-editor-text-area') as HTMLTextAreaElement
+                    let start, end
+                    
+                    if (currentSelection) {
+                      // Use the stored selection from when the button was clicked
+                      start = currentSelection.start
+                      end = currentSelection.end
+                      setCurrentSelection(null) // Clear stored selection
+                    } else if (editorTextarea) {
+                      // Fallback to current selection
+                      start = editorTextarea.selectionStart
+                      end = editorTextarea.selectionEnd
+                    } else {
+                      // Last resort: append to end
+                      const currentContent = currentPage.md
+                      const separator = currentContent.endsWith('\n') ? '\n' : '\n\n'
+                      updatePage('md', currentContent + separator + linkMarkdown)
+                      return
+                    }
+                    
+                    const currentContent = currentPage.md
+                    const beforeCursor = currentContent.substring(0, start)
+                    const afterCursor = currentContent.substring(end)
+                    
+                    // Add some spacing if needed
+                    const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n')
+                    const needsSpaceAfter = afterCursor.length > 0 && !afterCursor.startsWith(' ') && !afterCursor.startsWith('\n')
+                    
+                    const spaceBefore = needsSpaceBefore ? ' ' : ''
+                    const spaceAfter = needsSpaceAfter ? ' ' : ''
+                    
+                    const newContent = beforeCursor + spaceBefore + linkMarkdown + spaceAfter + afterCursor
+                    updatePage('md', newContent)
+                    
+                    // Set cursor position after the inserted link and restore focus
+                    setTimeout(() => {
+                      if (editorTextarea) {
+                        const newCursorPos = start + spaceBefore.length + linkMarkdown.length + spaceAfter.length
+                        editorTextarea.setSelectionRange(newCursorPos, newCursorPos)
+                        editorTextarea.focus()
+                      }
+                    }, 10)
+                  }}
+                  onCreatePage={(path) => {
+                    const newPage: PageData = {
+                      title: path.replace('.html', '').replace(/[/_-]/g, ' '),
+                      md: '# New Page\n\nStart editing your content here...',
+                      date: new Date().toISOString().split('T')[0],
+                      image: '',
+                      links: []
+                    }
+                    
+                    setSitemap(prev => ({
+                      ...prev,
+                      [path]: newPage
+                    }))
+                    
+                    // Insert link to the new page at cursor position
+                    const linkMarkdown = `[${newPage.title}](/${path.replace('.html', '')})`
+                    const editorTextarea = document.querySelector('.w-md-editor-text-area') as HTMLTextAreaElement
+                    
+                    if (editorTextarea && document.activeElement === editorTextarea) {
+                      const start = editorTextarea.selectionStart
+                      const end = editorTextarea.selectionEnd
+                      const currentContent = currentPage.md
+                      
+                      const beforeCursor = currentContent.substring(0, start)
+                      const afterCursor = currentContent.substring(end)
+                      
+                      const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n')
+                      const needsSpaceAfter = afterCursor.length > 0 && !afterCursor.startsWith(' ') && !afterCursor.startsWith('\n')
+                      
+                      const spaceBefore = needsSpaceBefore ? ' ' : ''
+                      const spaceAfter = needsSpaceAfter ? ' ' : ''
+                      
+                      const newContent = beforeCursor + spaceBefore + linkMarkdown + spaceAfter + afterCursor
+                      updatePage('md', newContent)
+                      
+                      setTimeout(() => {
+                        const newCursorPos = start + spaceBefore.length + linkMarkdown.length + spaceAfter.length
+                        editorTextarea.setSelectionRange(newCursorPos, newCursorPos)
+                        editorTextarea.focus()
+                      }, 10)
+                    } else {
+                      const currentContent = currentPage.md
+                      const separator = currentContent.endsWith('\n') ? '\n' : '\n\n'
+                      updatePage('md', currentContent + separator + linkMarkdown)
+                    }
+                  }}
+                />
+              </div>
               <MDEditor
                 value={currentPage.md}
                 onChange={(value) => updatePage('md', value || '')}
@@ -299,6 +466,7 @@ function App() {
                 hideToolbar={false}
                 visibleDragBar={false}
                 data-color-mode="light"
+                commands={customCommands}
               />
             </div>
           </div>
