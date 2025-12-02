@@ -7,7 +7,7 @@ s3client = boto3.client(
     service_name='s3',
     aws_access_key_id=os.environ['UPCLOUD_OBJ_ID'],
     aws_secret_access_key=os.environ['UPCLOUD_OBJ_SECRET'],
-    endpoint_url=os.environ['UPCLOUD_OBJ_HOST']
+    endpoint_url=os.environ['UPCLOUD_OBJ_ENDPOINT']
 )
 bucket = os.environ['BUCKET_NAME']
 

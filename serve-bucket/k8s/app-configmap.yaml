@@ -5,6 +5,6 @@ metadata:
   labels:
     app: static-site
 data:
-  upcloud_obj_host: "${UPCLOUD_OBJ_HOST}"
+  upcloud_obj_endpoint: "${UPCLOUD_OBJ_ENDPOINT}"
   upcloud_obj_id: "${UPCLOUD_OBJ_ID}"
   upcloud_obj_secret: "${UPCLOUD_OBJ_SECRET}"

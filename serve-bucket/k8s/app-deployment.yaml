@@ -33,11 +33,11 @@ spec:
                 configMapKeyRef:
                   name: static-site
                   key: upcloud_obj_secret
-            - name: UPCLOUD_OBJ_HOST
+            - name: UPCLOUD_OBJ_ENDPOINT
               valueFrom:
                 configMapKeyRef:
                   name: static-site
-                  key: upcloud_obj_host
+                  key: upcloud_obj_endpoint
 
           ports:
             - containerPort: ${SERVER_PORT}
