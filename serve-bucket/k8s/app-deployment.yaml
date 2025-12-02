@@ -23,6 +23,8 @@ spec:
               value: '80'
             - name: HOST
               value: 0.0.0.0
+            - name: BUCKET_NAME
+              value: pa-f.net
             - name: UPCLOUD_OBJ_ID
               valueFrom:
                 configMapKeyRef:
