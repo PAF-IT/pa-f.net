@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: static-site
+  labels:
+    app: static-site
+data:
+  upcloud_obj_host: "${UPCLOUD_OBJ_HOST}"
+  upcloud_obj_id: "${UPCLOUD_OBJ_ID}"
+  upcloud_obj_secret: "${UPCLOUD_OBJ_SECRET}"

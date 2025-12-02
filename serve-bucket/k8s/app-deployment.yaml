@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-site
+  labels:
+    app: static-site
+spec:
+  selector:
+    matchLabels:
+      app: static-site
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: static-site
+    spec:
+      containers:
+        - image: ${IMAGE}
+          name: static-site
+          env:
+            - name: PORT
+              value: '80'
+            - name: HOST
+              value: 0.0.0.0
+            - name: UPCLOUD_OBJ_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: static-site
+                  key: upcloud_obj_id
+            - name: UPCLOUD_OBJ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: static-site
+                  key: upcloud_obj_secret
+            - name: UPCLOUD_OBJ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: static-site
+                  key: upcloud_obj_host
+
+          ports:
+            - containerPort: ${SERVER_PORT}
+              name: static-site
