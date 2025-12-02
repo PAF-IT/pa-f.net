@@ -28,7 +28,7 @@ spec:
                 configMapKeyRef:
                   name: static-site
                   key: upcloud_obj_id
-            - name: UPCLOUD_OBJ_HOST
+            - name: UPCLOUD_OBJ_SECRET
               valueFrom:
                 configMapKeyRef:
                   name: static-site
