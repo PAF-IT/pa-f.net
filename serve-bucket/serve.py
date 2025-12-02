@@ -5,9 +5,9 @@ from flask import Flask, request, jsonify, make_response
 
 s3client = boto3.client(
     service_name='s3',
-    aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-    aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
-    endpoint_url=os.environ['ENDPOINT_URL']
+    aws_access_key_id=os.environ['UPCLOUD_OBJ_ID'],
+    aws_secret_access_key=os.environ['UPCLOUD_OBJ_SECRET'],
+    endpoint_url=os.environ['UPCLOUD_OBJ_HOST']
 )
 bucket = os.environ['BUCKET_NAME']
 
