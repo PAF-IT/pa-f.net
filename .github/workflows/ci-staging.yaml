@@ -36,7 +36,7 @@ jobs:
         run: |
           IMAGE="ghcr.io/paf-it/${{ env.IMAGE_TAG }}:${{ github.sha }}"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
-          docker build --build-arg SERVER_PORT=${{ env.SERVER_PORT }} serve-bucket/ --tag ${{ env.IMAGE_TAG }}
+          docker build . --build-arg SERVER_PORT=${{ env.SERVER_PORT }} --tag ${{ env.IMAGE_TAG }}
           docker tag ${{ env.IMAGE_TAG }} $IMAGE
           docker push $IMAGE
 
