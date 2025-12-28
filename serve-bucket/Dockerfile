@@ -14,5 +14,7 @@ RUN pipenv sync
 
 COPY serve.py .
 COPY serve_waitress.py .
+COPY edit_simple.html sidebar.html .
+COPY ../palimpsest .
 
 CMD ["pipenv", "run", "python", "serve_waitress.py"]
