@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pa-f editor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" />
+  <link rel="stylesheet" href="./editor.css" />
+</head>
+<body>
+  <div id="login-pane" hidden>
+    <form id="login-form">
+      <h1>pa-f editor</h1>
+      <label>Username <input type="text" name="username" autocomplete="username" required /></label>
+      <label>Password <input type="password" name="password" autocomplete="current-password" required /></label>
+      <button type="submit">Sign in</button>
+      <div id="login-error" class="error"></div>
+    </form>
+  </div>
+
+  <div id="app-pane" hidden>
+    <header id="topbar">
+      <span class="brand">pa-f editor</span>
+      <span id="who"></span>
+      <span class="grow"></span>
+      <span id="status"></span>
+      <button id="save-btn" disabled>Save</button>
+      <button id="logout-btn">Sign out</button>
+    </header>
+
+    <div id="workspace">
+      <aside id="sidebar">
+        <div class="sidebar-header">
+          <input id="page-filter" type="search" placeholder="Filter pages…" />
+        </div>
+        <ul id="page-list"></ul>
+      </aside>
+
+      <main id="editor-area">
+        <div id="placeholder">Select a page on the left to begin editing.</div>
+        <div id="page-editor" hidden>
+          <div class="meta-row">
+            <label class="meta-field grow">
+              <span>Title</span>
+              <input id="page-title" type="text" />
+            </label>
+            <label class="meta-field">
+              <span>Date</span>
+              <input id="page-date" type="text" placeholder="e.g. 2026-05-28" />
+            </label>
+            <span class="path-label" id="page-path"></span>
+          </div>
+          <div id="quill-toolbar">
+            <span class="ql-formats">
+              <select class="ql-header">
+                <option selected></option>
+                <option value="2"></option>
+                <option value="3"></option>
+              </select>
+            </span>
+            <span class="ql-formats">
+              <button class="ql-bold"></button>
+              <button class="ql-italic"></button>
+              <button class="ql-link"></button>
+            </span>
+            <span class="ql-formats">
+              <button class="ql-list" value="ordered"></button>
+              <button class="ql-list" value="bullet"></button>
+              <button class="ql-blockquote"></button>
+            </span>
+            <span class="ql-formats">
+              <button class="ql-image" title="Insert image"></button>
+              <button class="ql-clean"></button>
+            </span>
+          </div>
+          <div id="quill-editor"></div>
+        </div>
+      </main>
+    </div>
+
+    <div id="toast"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+  <script src="./editor.js"></script>
+</body>
+</html>

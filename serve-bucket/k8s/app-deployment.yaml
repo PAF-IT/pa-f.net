@@ -40,6 +40,13 @@ spec:
                 configMapKeyRef:
                   name: static-site
                   key: upcloud_obj_endpoint
+            - name: JWT_SECRET
+              valueFrom:
+                configMapKeyRef:
+                  name: static-site
+                  key: jwt_secret
+            - name: COOKIE_SECURE
+              value: '1'
 
           ports:
             - containerPort: ${SERVER_PORT}
