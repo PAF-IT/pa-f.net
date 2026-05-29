@@ -3,6 +3,7 @@ Static site generator module for creating HTML files from parsed content.
 """
 
 from markdown import markdown
+from html import escape as html_escape
 import re
 import os
 import random
@@ -24,19 +25,35 @@ def markdown2html(md_content):
     return markdown(md_content, extensions=["extra"])
 
 
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+
+
+def excerpt(md_content, max_chars=180):
+    """Return a plain-text excerpt of markdown suitable for og:description."""
+    text = _TAG_RE.sub("", markdown2html(md_content or ""))
+    text = _WS_RE.sub(" ", text).strip()
+    if len(text) <= max_chars:
+        return text
+    cut = text[:max_chars].rsplit(" ", 1)[0]
+    return f"{cut}…"
+
+
 class StaticSiteGenerator:
     """Generator for creating static HTML sites from parsed content."""
 
-    def __init__(self, sitemap_data=None, output_dir="paf-static"):
+    def __init__(self, sitemap_data=None, output_dir="paf-static", site_root="https://pa-f.net"):
         """
         Initialize the generator.
 
         Args:
             sitemap_data (dict): Parsed sitemap data
             output_dir (str): Output directory for generated site
+            site_root (str): Absolute origin used for canonical/OG URLs
         """
         self.sitemap = sitemap_data or {}
         self.output_dir = output_dir
+        self.site_root = site_root.rstrip("/")
         self.sidebar_content = ""
 
     def load_sitemap(self, sitemap_path='sitemap.json'):
@@ -140,13 +157,41 @@ class StaticSiteGenerator:
             if page_data.get("date"):
                 title_html += f'<div id="date">{page_data["date"]}</div>'
 
+        # --- Open Graph / Twitter Card meta tags ---
+        page_title = page_data.get("title") or "pa-f"
+        description = excerpt(page_data.get("md", ""))
+        canonical = f"{self.site_root}/{page_path.lstrip('/')}"
+        # Hero image: explicit `image` field if set, else the same random one used in the sidebar.
+        hero = page_data.get("image") or im_path
+        if hero:
+            hero_abs = hero if hero.startswith("http") else f"{self.site_root}/{hero.lstrip('/')}"
+        else:
+            hero_abs = ""
+        og_title = html_escape(page_title, quote=True)
+        og_desc = html_escape(description, quote=True)
+        og_url = html_escape(canonical, quote=True)
+        og_image = html_escape(hero_abs, quote=True)
+        og_image_tag = f'<meta property="og:image" content="{og_image}" />\n    <meta name="twitter:image" content="{og_image}" />' if hero_abs else ""
+        meta_tags = f"""<link rel="canonical" href="{og_url}" />
+    <meta name="description" content="{og_desc}" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="pa-f" />
+    <meta property="og:title" content="{og_title}" />
+    <meta property="og:description" content="{og_desc}" />
+    <meta property="og:url" content="{og_url}" />
+    {og_image_tag}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{og_title}" />
+    <meta name="twitter:description" content="{og_desc}" />"""
+
         # Generate complete HTML
         html = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{page_data["title"]} | pa-f</title>
+    <title>{html_escape(page_title, quote=True)} | pa-f</title>
+    {meta_tags}
     <style>
         * {{
             box-sizing: border-box;
