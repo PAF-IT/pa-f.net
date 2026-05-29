@@ -1,17 +1,42 @@
-// pa-f editor — vanilla JS + Quill 2.0
+// pa-f editor — Quill 2.0 inside Vite bundle
+import Quill from 'quill';
 
 const $ = (sel) => document.querySelector(sel);
 
 const state = {
   username: null,
-  pages: {},           // path -> {title, date, image, html}
-  initialJson: "",     // JSON of pages at last save (for dirty detection)
+  pages: {},               // path -> {title, date, image, html}
+  originalPaths: new Map(),// currentPath -> originalPath (load-time key). Missing => new page.
+  initialJson: "",         // JSON of pages at last save (for dirty detection)
   activePath: null,
   quill: null,
   dirtyPaths: new Set(),
+  pathValid: true,
 };
 
-// ---------- API helpers ----------
+// ---------- Utilities ----------
+
+function slugify(s) {
+  const slug = (s || "")
+    .toLowerCase()
+    .normalize("NFKD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return slug || "page";
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function snapshot() {
+  // Stable JSON snapshot of pages, key-sorted, used for dirty detection.
+  const keys = Object.keys(state.pages).sort();
+  return JSON.stringify(keys.map((k) => [k, state.pages[k]]));
+}
+
+// ---------- API ----------
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -57,7 +82,7 @@ $("#login-form").addEventListener("submit", async (e) => {
     });
     state.username = data.username;
     await boot();
-  } catch (err) {
+  } catch {
     $("#login-error").textContent = "Invalid credentials.";
   }
 });
@@ -75,7 +100,7 @@ async function boot() {
     const me = await api("/api/editor/me");
     state.username = me.username;
   } catch {
-    return; // showLogin already called
+    return;
   }
   $("#who").textContent = state.username;
   showApp();
@@ -86,16 +111,21 @@ async function boot() {
 async function loadSitemap() {
   const data = await api("/api/editor/sitemap");
   state.pages = data.pages || {};
-  state.initialJson = JSON.stringify(state.pages);
+  state.originalPaths = new Map(Object.keys(state.pages).map((p) => [p, p]));
+  state.initialJson = snapshot();
   state.dirtyPaths.clear();
   renderPageList();
   updateSaveButton();
   if (state.activePath && state.pages[state.activePath]) {
     showPage(state.activePath);
+  } else {
+    state.activePath = null;
+    $("#page-editor").hidden = true;
+    $("#placeholder").hidden = false;
   }
 }
 
-// ---------- Page list ----------
+// ---------- Sidebar ----------
 
 function renderPageList() {
   const filter = ($("#page-filter").value || "").toLowerCase();
@@ -103,16 +133,16 @@ function renderPageList() {
   ul.innerHTML = "";
   const paths = Object.keys(state.pages).sort();
   for (const path of paths) {
+    const page = state.pages[path];
     if (filter && !path.toLowerCase().includes(filter) &&
-        !(state.pages[path].title || "").toLowerCase().includes(filter)) {
-      continue;
-    }
+        !(page.title || "").toLowerCase().includes(filter)) continue;
     const li = document.createElement("li");
-    const title = state.pages[path].title || "(untitled)";
+    const title = page.title || "(untitled)";
     li.textContent = `${title} — ${path}`;
     li.dataset.path = path;
     if (path === state.activePath) li.classList.add("active");
     if (state.dirtyPaths.has(path)) li.classList.add("dirty");
+    if (!state.originalPaths.has(path)) li.classList.add("new");
     li.addEventListener("click", () => showPage(path));
     ul.appendChild(li);
   }
@@ -137,8 +167,7 @@ function initQuill() {
   });
   state.quill.on("text-change", () => {
     if (suppressEditorEvents || !state.activePath) return;
-    const html = state.quill.root.innerHTML;
-    state.pages[state.activePath].html = html;
+    state.pages[state.activePath].html = state.quill.root.innerHTML;
     markDirty(state.activePath);
   });
 }
@@ -150,9 +179,12 @@ function showPage(path) {
 
   $("#placeholder").hidden = true;
   $("#page-editor").hidden = false;
-  $("#page-path").textContent = path;
   $("#page-title").value = page.title || "";
   $("#page-date").value = page.date || "";
+  $("#page-path").value = path;
+  $("#page-image").value = page.image || "";
+
+  validatePath(path);
 
   suppressEditorEvents = true;
   state.quill.root.innerHTML = page.html || "";
@@ -174,34 +206,140 @@ $("#page-date").addEventListener("input", (e) => {
   markDirty(state.activePath);
 });
 
+$("#page-image").addEventListener("input", (e) => {
+  if (!state.activePath) return;
+  state.pages[state.activePath].image = e.target.value;
+  markDirty(state.activePath);
+});
+
+// ---------- Path editing ----------
+
+function validatePath(value) {
+  const input = $("#page-path");
+  const err = $("#path-error");
+  const reasons = [];
+  if (!value) reasons.push("path required");
+  if (value.startsWith("/")) reasons.push("no leading slash");
+  if (/\s/.test(value)) reasons.push("no whitespace");
+  if (!/\.html?$/.test(value)) reasons.push("must end in .html");
+  for (const other of Object.keys(state.pages)) {
+    if (other !== state.activePath && other === value) {
+      reasons.push("collides with another page");
+      break;
+    }
+  }
+  const ok = reasons.length === 0;
+  input.classList.toggle("invalid", !ok);
+  err.textContent = ok ? "" : reasons.join("; ");
+  state.pathValid = ok;
+  updateSaveButton();
+  return ok;
+}
+
+$("#page-path").addEventListener("input", (e) => {
+  if (!state.activePath) return;
+  const newPath = e.target.value;
+  validatePath(newPath);
+
+  // Rename in place, preserving insertion order.
+  const oldPath = state.activePath;
+  if (newPath === oldPath) return;
+
+  const oldOriginal = state.originalPaths.get(oldPath);
+  const renamed = {};
+  for (const [k, v] of Object.entries(state.pages)) {
+    renamed[k === oldPath ? newPath : k] = v;
+  }
+  state.pages = renamed;
+  state.originalPaths.delete(oldPath);
+  if (oldOriginal !== undefined) state.originalPaths.set(newPath, oldOriginal);
+  state.dirtyPaths.delete(oldPath);
+  state.activePath = newPath;
+  markDirty(newPath);
+  renderPageList();
+});
+
+// ---------- New / delete page ----------
+
+$("#new-page-btn").addEventListener("click", () => {
+  const title = prompt("Title for the new page:");
+  if (!title) return;
+  const trimmed = title.trim();
+  if (!trimmed) return;
+
+  let path = `${slugify(trimmed)}.html`;
+  let i = 2;
+  while (state.pages[path]) {
+    path = `${slugify(trimmed)}-${i}.html`;
+    i++;
+  }
+
+  state.pages[path] = {
+    title: trimmed,
+    date: todayIso(),
+    image: "",
+    html: "",
+  };
+  // originalPaths intentionally does NOT include this — flags it as new.
+  markDirty(path);
+  showPage(path);
+});
+
+$("#delete-page-btn").addEventListener("click", () => {
+  if (!state.activePath) return;
+  if (!confirm(`Delete page "${state.activePath}"? This removes it from the sitemap on next save.`)) return;
+  const path = state.activePath;
+  delete state.pages[path];
+  state.originalPaths.delete(path);
+  state.dirtyPaths.delete(path);
+  state.activePath = null;
+  $("#page-editor").hidden = true;
+  $("#placeholder").hidden = false;
+  // The save itself is what triggers the bucket-side delete. Mark dirty via the snapshot diff.
+  updateSaveButton();
+  renderPageList();
+});
+
+// ---------- Dirty / Save ----------
+
 function markDirty(path) {
   state.dirtyPaths.add(path);
   updateSaveButton();
 }
 
 function isDirty() {
-  return state.dirtyPaths.size > 0 ||
-    JSON.stringify(state.pages) !== state.initialJson;
+  return snapshot() !== state.initialJson;
 }
 
 function updateSaveButton() {
-  $("#save-btn").disabled = !isDirty();
-  $("#status").textContent = isDirty()
-    ? `${state.dirtyPaths.size} unsaved`
-    : "All changes saved";
+  const dirty = isDirty();
+  $("#save-btn").disabled = !dirty || !state.pathValid;
+  $("#status").textContent = !state.pathValid
+    ? "Fix path before saving"
+    : dirty ? `${state.dirtyPaths.size || "•"} unsaved` : "All changes saved";
 }
 
-// ---------- Save ----------
+function renameMap() {
+  // {currentPath: originalPath} for entries whose key changed.
+  const out = {};
+  for (const [cur, orig] of state.originalPaths.entries()) {
+    if (cur !== orig) out[cur] = orig;
+  }
+  return out;
+}
 
 $("#save-btn").addEventListener("click", async () => {
+  if (!state.pathValid) return;
   $("#save-btn").disabled = true;
   $("#status").textContent = "Saving…";
   try {
     await api("/api/editor/sitemap", {
       method: "PUT",
-      body: JSON.stringify({ pages: state.pages }),
+      body: JSON.stringify({ pages: state.pages, rename_map: renameMap() }),
     });
-    state.initialJson = JSON.stringify(state.pages);
+    // After save, the canonical state matches what's on the server.
+    state.originalPaths = new Map(Object.keys(state.pages).map((p) => [p, p]));
+    state.initialJson = snapshot();
     state.dirtyPaths.clear();
     renderPageList();
     updateSaveButton();
@@ -212,7 +350,7 @@ $("#save-btn").addEventListener("click", async () => {
   }
 });
 
-// ---------- Image upload (Quill toolbar handler) ----------
+// ---------- Image upload ----------
 
 function uploadImageHandler() {
   const input = document.createElement("input");
@@ -228,9 +366,7 @@ function uploadImageHandler() {
     toast("Uploading…");
     try {
       const res = await fetch("/api/editor/upload", {
-        method: "POST",
-        credentials: "same-origin",
-        body: fd,
+        method: "POST", credentials: "same-origin", body: fd,
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
@@ -269,10 +405,7 @@ function toast(msg, isError = false) {
 }
 
 window.addEventListener("beforeunload", (e) => {
-  if (isDirty()) {
-    e.preventDefault();
-    e.returnValue = "";
-  }
+  if (isDirty()) { e.preventDefault(); e.returnValue = ""; }
 });
 
 // ---------- Go ----------

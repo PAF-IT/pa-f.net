@@ -8,7 +8,7 @@ from app.routes_editor import router as editor_router
 from app.routes_proxy import router as proxy_router
 
 BASE_DIR = Path(__file__).parent.parent
-EDITOR_DIR = BASE_DIR / "editor"
+EDITOR_DIR = BASE_DIR / "editor" / "dist"
 
 app = FastAPI(title="paf-serve-bucket")
 

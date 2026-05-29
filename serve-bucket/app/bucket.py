@@ -48,6 +48,10 @@ def copy_object(src_key: str, dst_key: str):
     )
 
 
+def delete_object(key: str):
+    _client.delete_object(Bucket=BUCKET, Key=key.lstrip("/"))
+
+
 def object_exists(key: str) -> bool:
     try:
         _client.head_object(Bucket=BUCKET, Key=key.lstrip("/"))

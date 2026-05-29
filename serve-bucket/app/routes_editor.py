@@ -120,6 +120,7 @@ class PageIn(BaseModel):
 
 class SitemapIn(BaseModel):
     pages: dict[str, PageIn]
+    rename_map: dict[str, str] = {}  # new_path -> old_path
 
 
 def _archive_key() -> str:
@@ -131,8 +132,10 @@ def _convert_pages_to_md(payload: SitemapIn, prior: dict[str, Any]) -> dict[str,
     out: dict[str, Any] = {}
     for path, page in payload.pages.items():
         md = html_to_md(page.html or "", heading_style="ATX").strip() + "\n"
-        # Preserve fields we don't surface in the editor (e.g. arbitrary metadata)
-        existing = prior.get(path, {})
+        # For renames, look up the page's original key so pass-through fields
+        # (e.g. `links`) follow it.
+        lookup = payload.rename_map.get(path, path)
+        existing = prior.get(lookup, {})
         merged = dict(existing)
         merged.update(
             title=page.title,
@@ -165,6 +168,9 @@ def put_sitemap(payload: SitemapIn, username: str = Depends(get_current_user)):
     prior = _load_sitemap()
     new_sitemap = _convert_pages_to_md(payload, prior)
 
+    # Paths that existed before but are gone now (deletes + the source side of renames).
+    delete_paths = set(prior) - set(new_sitemap)
+
     # Archive the prior sitemap (if it exists) before overwriting
     if prior:
         try:
@@ -182,7 +188,20 @@ def put_sitemap(payload: SitemapIn, username: str = Depends(get_current_user)):
     # Regenerate the static HTML and overwrite the live site
     _regenerate_and_upload(new_sitemap)
 
-    return {"ok": True, "page_count": len(new_sitemap)}
+    # Clean up generated HTML for pages that no longer exist (renamed-from or deleted).
+    deleted = []
+    for path in delete_paths:
+        try:
+            bucket.delete_object(path)
+            deleted.append(path)
+        except ClientError:
+            pass  # Already gone or never existed; not worth failing the save.
+
+    return {
+        "ok": True,
+        "page_count": len(new_sitemap),
+        "deleted_paths": deleted,
+    }
 
 
 # --- Image upload -------------------------------------------------------

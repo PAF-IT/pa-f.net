@@ -4,8 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>pa-f editor</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" />
-  <link rel="stylesheet" href="./editor.css" />
+  <script type="module" src="./src/main.js"></script>
 </head>
 <body>
   <div id="login-pane" hidden>
@@ -32,23 +31,33 @@
       <aside id="sidebar">
         <div class="sidebar-header">
           <input id="page-filter" type="search" placeholder="Filter pages…" />
+          <button id="new-page-btn" type="button" title="Create a new page">+ New page</button>
         </div>
         <ul id="page-list"></ul>
       </aside>
 
       <main id="editor-area">
-        <div id="placeholder">Select a page on the left to begin editing.</div>
+        <div id="placeholder">Select a page on the left to begin editing, or click <em>+ New page</em>.</div>
         <div id="page-editor" hidden>
-          <div class="meta-row">
-            <label class="meta-field grow">
+          <div class="meta-grid">
+            <label class="meta-field span2">
               <span>Title</span>
               <input id="page-title" type="text" />
             </label>
             <label class="meta-field">
               <span>Date</span>
-              <input id="page-date" type="text" placeholder="e.g. 2026-05-28" />
+              <input id="page-date" type="text" placeholder="YYYY-MM-DD" />
             </label>
-            <span class="path-label" id="page-path"></span>
+            <label class="meta-field span2">
+              <span>URL / path <em class="hint">(e.g. events/my-page.html)</em></span>
+              <input id="page-path" type="text" spellcheck="false" />
+              <span class="field-error" id="path-error"></span>
+            </label>
+            <label class="meta-field">
+              <span>Hero image URL</span>
+              <input id="page-image" type="text" spellcheck="false" placeholder="/sites/pa-f.net/files/…" />
+            </label>
+            <button id="delete-page-btn" type="button" class="danger" title="Delete this page">Delete page</button>
           </div>
           <div id="quill-toolbar">
             <span class="ql-formats">
@@ -80,8 +89,5 @@
 
     <div id="toast"></div>
   </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
-  <script src="./editor.js"></script>
 </body>
 </html>
