@@ -39,26 +39,6 @@
       <main id="editor-area">
         <div id="placeholder">Select a page on the left to begin editing, or click <em>+ New page</em>.</div>
         <div id="page-editor" hidden>
-          <div class="meta-grid">
-            <label class="meta-field span2">
-              <span>Title</span>
-              <input id="page-title" type="text" />
-            </label>
-            <label class="meta-field">
-              <span>Date</span>
-              <input id="page-date" type="text" placeholder="YYYY-MM-DD" />
-            </label>
-            <label class="meta-field span2">
-              <span>URL / path <em class="hint">(e.g. events/my-page.html)</em></span>
-              <input id="page-path" type="text" spellcheck="false" />
-              <span class="field-error" id="path-error"></span>
-            </label>
-            <label class="meta-field">
-              <span>Hero image URL</span>
-              <input id="page-image" type="text" spellcheck="false" placeholder="/sites/pa-f.net/files/…" />
-            </label>
-            <button id="delete-page-btn" type="button" class="danger" title="Delete this page">Delete page</button>
-          </div>
           <div id="quill-toolbar">
             <span class="ql-formats">
               <select class="ql-header">
@@ -85,9 +65,56 @@
           <div id="quill-editor"></div>
         </div>
       </main>
+
+      <aside id="meta-pane">
+        <button id="meta-toggle" type="button" title="Toggle meta panel">›</button>
+        <div class="meta-pane-body">
+          <label class="meta-field">
+            <span>Title</span>
+            <input id="page-title" type="text" />
+          </label>
+          <label class="meta-field">
+            <span>Date</span>
+            <input id="page-date" type="text" placeholder="YYYY-MM-DD" />
+          </label>
+          <label class="meta-field">
+            <span>URL / path</span>
+            <input id="page-path" type="text" spellcheck="false" placeholder="events/my-page.html" />
+            <span class="field-error" id="path-error"></span>
+          </label>
+          <div class="meta-field">
+            <span>Hero image</span>
+            <div id="hero-controls">
+              <img id="hero-thumb" alt="" hidden />
+              <button id="hero-upload-btn" type="button">Upload hero image…</button>
+              <button id="hero-clear-btn" type="button" class="link" hidden>Clear</button>
+            </div>
+          </div>
+          <button id="delete-page-btn" type="button" class="danger">Delete page</button>
+        </div>
+      </aside>
     </div>
 
     <div id="toast"></div>
+
+    <div id="image-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close="1"></div>
+      <div class="modal-card">
+        <h3>Edit image</h3>
+        <img id="image-modal-preview" alt="" />
+        <label class="meta-field">
+          <span>Caption <em class="hint">(italic line below image; leave empty for none)</em></span>
+          <input id="image-modal-caption" type="text" />
+        </label>
+        <div class="modal-actions">
+          <button id="image-modal-replace" type="button">Replace image…</button>
+          <button id="image-modal-remove" type="button" class="danger">Remove</button>
+          <span class="grow"></span>
+          <button id="image-modal-cancel" type="button">Cancel</button>
+          <button id="image-modal-save" type="button" class="primary">Save</button>
+        </div>
+      </div>
+    </div>
   </div>
 </body>
 </html>

@@ -102,11 +102,17 @@ def get_sitemap(username: str = Depends(get_current_user)):
     pages = {}
     for path, page in sitemap.items():
         md = page.get("md", "") or ""
+        html = palimpsest.generator.markdown2html(md) if md else ""
+        # Rewrite legacy relative image paths (e.g. ../sites/pa-f.net/files/x.jpg)
+        # to absolute (/sites/pa-f.net/files/x.jpg). This is the same form
+        # palimpsest.generator.images_from_root produces on output, and the only
+        # form that works for both the prod /editor/ mount and the Vite dev server.
+        html = palimpsest.generator.images_from_root(html)
         pages[path] = {
             "title": page.get("title", ""),
             "date": page.get("date", ""),
             "image": page.get("image", ""),
-            "html": palimpsest.generator.markdown2html(md) if md else "",
+            "html": html,
         }
     return {"pages": pages}
 
