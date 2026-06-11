@@ -108,10 +108,11 @@ def get_sitemap(username: str = Depends(get_current_user)):
         # palimpsest.generator.images_from_root produces on output, and the only
         # form that works for both the prod /editor/ mount and the Vite dev server.
         html = palimpsest.generator.images_from_root(html)
+        img = page.get("image", "")
         pages[path] = {
             "title": page.get("title", ""),
             "date": page.get("date", ""),
-            "image": page.get("image", ""),
+            "image": img if isinstance(img, str) else "",
             "html": html,
         }
     return {"pages": pages}
