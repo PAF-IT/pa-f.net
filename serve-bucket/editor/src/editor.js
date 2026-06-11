@@ -169,7 +169,7 @@ function initQuill() {
     modules: {
       toolbar: {
         container: '#quill-toolbar',
-        handlers: { image: insertNewImageHandler },
+        handlers: { image: insertNewImageHandler, link: handleLinkInsertion },
       },
     },
   });
@@ -186,6 +186,52 @@ function initQuill() {
     e.preventDefault();
     openImageModal(img);
   });
+}
+
+// Canonicalize a link the user typed into the link prompt.
+// Returns { url, resolved }: url is what we store in the href, resolved is
+// whether it points at a known sitemap page (so we can warn for misses).
+function canonicalizeLink(raw) {
+  const input = (raw || '').trim();
+  if (!input) return { url: '', resolved: true };
+  // Absolute / special schemes and pure fragments / queries: pass through.
+  if (/^(https?:|mailto:|tel:|\/\/|#|\?)/i.test(input)) {
+    return { url: input, resolved: true };
+  }
+  // Split off query/fragment so we only normalize the path.
+  const m = input.match(/^([^?#]*)([?#].*)?$/);
+  let path = m[1];
+  const tail = m[2] || '';
+  path = path.replace(/^\/+/, '');
+  // Don't touch index.html; otherwise strip trailing .html
+  if (!(path === 'index.html' || path.endsWith('/index.html')) && path.endsWith('.html')) {
+    path = path.slice(0, -'.html'.length);
+  }
+  const resolved = Object.prototype.hasOwnProperty.call(state.pages, path);
+  return { url: `/${path}${tail}`, resolved };
+}
+
+function handleLinkInsertion(value) {
+  if (!value) {
+    this.quill.format('link', false);
+    return;
+  }
+  const range = this.quill.getSelection(true);
+  // Pre-fill with the current link's href, if any.
+  let existing = '';
+  if (range) {
+    const fmt = this.quill.getFormat(range);
+    if (typeof fmt.link === 'string') existing = fmt.link;
+  }
+  const raw = window.prompt('Link URL (or page path):', existing);
+  if (raw === null) return; // user cancelled
+  if (!raw.trim()) {
+    this.quill.format('link', false);
+    return;
+  }
+  const { url, resolved } = canonicalizeLink(raw);
+  this.quill.format('link', url);
+  if (!resolved) toast(`Warning: "${url}" does not match any known page.`, true);
 }
 
 function showPage(path) {
@@ -292,8 +338,13 @@ function validatePath(value) {
   const reasons = [];
   if (!value) reasons.push('path required');
   if (value.startsWith('/')) reasons.push('no leading slash');
+  if (value.endsWith('/')) reasons.push('no trailing slash');
   if (/\s/.test(value)) reasons.push('no whitespace');
-  if (!/\.html?$/.test(value)) reasons.push('must end in .html');
+  // Extensionless paths only (URL canonical form). `index.html` is the one
+  // exception — it's the home-page key the backend preserves.
+  const lastSeg = value.split('/').pop() || '';
+  const isIndex = value === 'index.html' || value.endsWith('/index.html');
+  if (!isIndex && lastSeg.includes('.')) reasons.push('no file extension');
   for (const other of Object.keys(state.pages)) {
     if (other !== state.activePath && other === value) {
       reasons.push('collides with another page');
@@ -335,9 +386,9 @@ $('#new-page-btn').addEventListener('click', () => {
   if (!title) return;
   const trimmed = title.trim();
   if (!trimmed) return;
-  let path = `${slugify(trimmed)}.html`;
+  let path = slugify(trimmed);
   let i = 2;
-  while (state.pages[path]) { path = `${slugify(trimmed)}-${i}.html`; i++; }
+  while (state.pages[path]) { path = `${slugify(trimmed)}-${i}`; i++; }
   state.pages[path] = { title: trimmed, date: todayIso(), image: '', html: '' };
   markDirty(path);
   showPage(path);

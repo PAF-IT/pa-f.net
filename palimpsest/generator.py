@@ -140,12 +140,12 @@ class StaticSiteGenerator:
                      "paf-pink.png", "paf-waves.png"]
         logo_name = random.choice(logo_names)
         logo_path = f"/sites/pa-f.net/files/{logo_name}"
-        home_path = f"{root_path}index.html"
+        home_path = root_path or "/"
 
         # Pick random image
         if all_images:
             im_pagepath, im_path = random.choice(all_images)
-            im_pagepath = root_path + im_pagepath
+            im_pagepath = root_path + strip_html_suffix(im_pagepath)
             im_path = images_from_root(root_path + im_path)
         else:
             im_pagepath = im_path = ""
@@ -160,7 +160,7 @@ class StaticSiteGenerator:
         # --- Open Graph / Twitter Card meta tags ---
         page_title = page_data.get("title") or "pa-f"
         description = excerpt(page_data.get("md", ""))
-        canonical = f"{self.site_root}/{page_path.lstrip('/')}"
+        canonical = f"{self.site_root}/{strip_html_suffix(page_path.lstrip('/'))}"
         # Hero image: explicit `image` field if set, else the same random one used in the sidebar.
         hero = page_data.get("image") or im_path
         if hero:
@@ -302,15 +302,15 @@ class StaticSiteGenerator:
             <nav>
                 <ul>
                     <li><a href="{home_path}">home</a></li>
-                    <li><a href="{root_path}node/25153.html">news</a></li>
-                    <li><a href="{root_path}downloads.html">downloads</a></li>
-                    <li><a href="{root_path}program.html">events</a></li>
-                    <li><a href="{root_path}basics.html">basics</a></li>
-                    <li><a href="{root_path}image.html">galleries</a></li>
-                    <li><a href="{root_path}basics/directions.html">how to get to PAF</a></li>
-                    <li><a href="{root_path}node/25189.html">the mattress</a></li>
-                    <li><a href="{root_path}contacts.html">contact</a></li>
-                    <li><a href="{root_path}links.html">partners</a></li>
+                    <li><a href="{root_path}node/25153">news</a></li>
+                    <li><a href="{root_path}downloads">downloads</a></li>
+                    <li><a href="{root_path}program">events</a></li>
+                    <li><a href="{root_path}basics">basics</a></li>
+                    <li><a href="{root_path}image">galleries</a></li>
+                    <li><a href="{root_path}basics/directions">how to get to PAF</a></li>
+                    <li><a href="{root_path}node/25189">the mattress</a></li>
+                    <li><a href="{root_path}contacts">contact</a></li>
+                    <li><a href="{root_path}links">partners</a></li>
                 </ul>
             <br />"""
 
@@ -376,3 +376,17 @@ class StaticSiteGenerator:
 def images_from_root(html):
     # remove relative paths here to support versions (without copying images over)
     return re.sub(r"(\.\./)*sites/pa\-f\.net", "/sites/pa-f.net", html)
+
+
+def strip_html_suffix(path: str) -> str:
+    """Return the canonical extensionless form of a page path.
+
+    Bucket object names still end in `.html`; this maps them to the URL form.
+    """
+    if path.endswith("/index.html"):
+        return path[: -len("index.html")]  # keep trailing slash
+    if path == "index.html":
+        return ""
+    if path.endswith(".html"):
+        return path[: -len(".html")]
+    return path

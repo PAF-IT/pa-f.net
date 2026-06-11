@@ -86,6 +86,24 @@ def reload_users(username: str = Depends(get_current_user)):
 
 # --- Sitemap ------------------------------------------------------------
 
+def _bare_key(key: str) -> str:
+    """Normalize a sitemap key to its extensionless form.
+
+    `index.html` and `*/index.html` are preserved (they're directory roots,
+    and an empty dict key would be confusing).
+    """
+    if key == "index.html" or key.endswith("/index.html"):
+        return key
+    if key.endswith(".html"):
+        return key[: -len(".html")]
+    return key
+
+
+def _bucket_key(key: str) -> str:
+    """Map a sitemap key to its bucket object name (always ends in .html)."""
+    return key if key.endswith(".html") else f"{key}.html"
+
+
 def _load_sitemap() -> dict[str, Any]:
     try:
         raw = bucket.get_bytes(SITEMAP_KEY)
@@ -93,7 +111,9 @@ def _load_sitemap() -> dict[str, Any]:
         if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
             return {}
         raise
-    return json.loads(raw)
+    data = json.loads(raw)
+    # Legacy: keys may include `.html`. Normalize to bare form on read.
+    return {_bare_key(k): v for k, v in data.items()}
 
 
 @router.get("/sitemap")
@@ -156,8 +176,11 @@ def _convert_pages_to_md(payload: SitemapIn, prior: dict[str, Any]) -> dict[str,
 
 
 def _regenerate_and_upload(sitemap: dict[str, Any]):
+    # Sitemap keys are bare (extensionless); the generator writes one file per
+    # key, and bucket object names need to keep the .html suffix.
+    gen_sitemap = {_bucket_key(k): v for k, v in sitemap.items()}
     with tempfile.TemporaryDirectory() as tdir:
-        ssg = palimpsest.StaticSiteGenerator(sitemap, output_dir=tdir)
+        ssg = palimpsest.StaticSiteGenerator(gen_sitemap, output_dir=tdir)
         if SIDEBAR_PATH.exists():
             ssg.load_sidebar(str(SIDEBAR_PATH))
         ssg.generate_site()
@@ -200,7 +223,7 @@ def put_sitemap(payload: SitemapIn, username: str = Depends(get_current_user)):
     deleted = []
     for path in delete_paths:
         try:
-            bucket.delete_object(path)
+            bucket.delete_object(_bucket_key(path))
             deleted.append(path)
         except ClientError:
             pass  # Already gone or never existed; not worth failing the save.
