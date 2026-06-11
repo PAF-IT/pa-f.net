@@ -374,8 +374,11 @@ class StaticSiteGenerator:
 
 
 def images_from_root(html):
-    # remove relative paths here to support versions (without copying images over)
-    return re.sub(r"(\.\./)*sites/pa\-f\.net", "/sites/pa-f.net", html)
+    # Rewrite relative `../sites/pa-f.net` references to absolute `/sites/pa-f.net`.
+    # Require at least one `../` — otherwise an already-absolute `/sites/pa-f.net`
+    # would gain a second leading slash and resolve as protocol-relative
+    # (browser reads `//sites/pa-f.net/...` as `https://sites/pa-f.net/...`).
+    return re.sub(r"(?:\.\./)+sites/pa\-f\.net", "/sites/pa-f.net", html)
 
 
 def strip_html_suffix(path: str) -> str:
