@@ -3,19 +3,13 @@
 html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 body { background: #f6f6f6; color: #222; }
 
-/* Login */
-#login-pane {
+/* Access denied */
+#denied-pane {
   display: flex; align-items: center; justify-content: center; height: 100vh;
+  text-align: center;
 }
-#login-form {
-  background: white; padding: 2rem; border-radius: 8px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-  display: flex; flex-direction: column; gap: 0.75rem; min-width: 280px;
-}
-#login-form h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
-#login-form label { display: flex; flex-direction: column; font-size: 0.85rem; gap: 0.25rem; }
-#login-form input { padding: 0.5rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; }
-#login-form button { padding: 0.6rem; font-size: 1rem; cursor: pointer; background: #333; color: white; border: 0; border-radius: 4px; }
+#denied-pane h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+#denied-pane p { color: #b33; font-size: 0.95rem; }
 .error { color: #b33; min-height: 1.2em; font-size: 0.85rem; }
 
 /* App */
@@ -31,7 +25,6 @@ body { background: #f6f6f6; color: #222; }
   border: 0; border-radius: 4px; font-weight: bold;
 }
 #topbar button[disabled] { background: #555; color: #aaa; cursor: not-allowed; }
-#topbar #logout-btn { background: #444; color: #ddd; font-weight: normal; }
 #status { font-size: 0.85rem; color: #ddd; min-width: 9em; text-align: right; }
 #who { font-size: 0.85rem; color: #aaa; }
 

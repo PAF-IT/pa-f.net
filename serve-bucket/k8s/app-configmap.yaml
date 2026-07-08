@@ -8,4 +8,3 @@ data:
   upcloud_obj_endpoint: "${UPCLOUD_OBJ_ENDPOINT}"
   upcloud_obj_id: "${UPCLOUD_OBJ_ID}"
   upcloud_obj_secret: "${UPCLOUD_OBJ_SECRET}"
-  jwt_secret: "${JWT_SECRET}"

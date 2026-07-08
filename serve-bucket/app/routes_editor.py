@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from botocore.exceptions import ClientError
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from markdown import markdown as md_to_html
 from markdownify import markdownify as html_to_md
 from pydantic import BaseModel
@@ -16,14 +16,7 @@ from pydantic import BaseModel
 import palimpsest
 
 from app import bucket
-from app.auth import (
-    COOKIE_NAME,
-    create_access_token,
-    get_current_user,
-    invalidate_users_cache,
-    load_users,
-    verify_password,
-)
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/editor")
 
@@ -42,46 +35,9 @@ IMAGE_CONTENT_TYPES = {
 
 # --- Auth ---------------------------------------------------------------
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-@router.post("/login")
-def login(req: LoginRequest, response: Response):
-    users = load_users()
-    hashed = users.get(req.username)
-    if not hashed or not verify_password(req.password, hashed):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_access_token(req.username)
-    secure = os.environ.get("COOKIE_SECURE", "0") == "1"
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        secure=secure,
-        max_age=60 * 60 * 24 * 30,
-        path="/",
-    )
-    return {"username": req.username}
-
-
-@router.post("/logout")
-def logout(response: Response):
-    response.delete_cookie(COOKIE_NAME, path="/")
-    return {"ok": True}
-
-
 @router.get("/me")
 def me(username: str = Depends(get_current_user)):
     return {"username": username}
-
-
-@router.post("/users/reload")
-def reload_users(username: str = Depends(get_current_user)):
-    invalidate_users_cache()
-    return {"ok": True, "users": list(load_users().keys())}
 
 
 # --- Sitemap ------------------------------------------------------------

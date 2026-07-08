@@ -43,8 +43,8 @@ async function api(path, opts = {}) {
     headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
     ...opts,
   });
-  if (res.status === 401) {
-    showLogin();
+  if (res.status === 401 || res.status === 403) {
+    showDenied();
     throw new Error('Unauthorized');
   }
   if (!res.ok) {
@@ -77,32 +77,10 @@ function pickImageFile() {
   });
 }
 
-// ---------- Login flow ----------
+// ---------- Access ----------
 
-function showLogin() { $('#app-pane').hidden = true; $('#login-pane').hidden = false; }
-function showApp() { $('#login-pane').hidden = true; $('#app-pane').hidden = false; }
-
-$('#login-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  $('#login-error').textContent = '';
-  const fd = new FormData(e.target);
-  try {
-    const data = await api('/api/editor/login', {
-      method: 'POST',
-      body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') }),
-    });
-    state.username = data.username;
-    await boot();
-  } catch {
-    $('#login-error').textContent = 'Invalid credentials.';
-  }
-});
-
-$('#logout-btn').addEventListener('click', async () => {
-  if (isDirty() && !confirm('You have unsaved changes. Sign out anyway?')) return;
-  await fetch('/api/editor/logout', { method: 'POST', credentials: 'same-origin' });
-  location.reload();
-});
+function showDenied() { $('#app-pane').hidden = true; $('#denied-pane').hidden = false; }
+function showApp() { $('#denied-pane').hidden = true; $('#app-pane').hidden = false; }
 
 // ---------- Boot ----------
 
@@ -641,4 +619,4 @@ window.addEventListener('beforeunload', (e) => {
 
 // ---------- Go ----------
 
-boot().catch(() => showLogin());
+boot().catch(() => showDenied());

@@ -7,14 +7,11 @@
   <script type="module" src="./src/main.js"></script>
 </head>
 <body>
-  <div id="login-pane" hidden>
-    <form id="login-form">
+  <div id="denied-pane" hidden>
+    <div>
       <h1>pa-f editor</h1>
-      <label>Username <input type="text" name="username" autocomplete="username" required /></label>
-      <label>Password <input type="password" name="password" autocomplete="current-password" required /></label>
-      <button type="submit">Sign in</button>
-      <div id="login-error" class="error"></div>
-    </form>
+      <p>You don't have editor access.</p>
+    </div>
   </div>
 
   <div id="app-pane" hidden>
@@ -24,7 +21,6 @@
       <span class="grow"></span>
       <span id="status"></span>
       <button id="save-btn" disabled>Save</button>
-      <button id="logout-btn">Sign out</button>
     </header>
 
     <div id="workspace">
