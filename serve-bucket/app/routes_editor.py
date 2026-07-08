@@ -1,0 +1,211 @@
+import json
+import mimetypes
+import os
+import re
+import tempfile
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from botocore.exceptions import ClientError
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from markdown import markdown as md_to_html
+from markdownify import markdownify as html_to_md
+from pydantic import BaseModel
+
+import palimpsest
+
+from app import bucket
+from app.auth import get_current_user
+
+router = APIRouter(prefix="/api/editor")
+
+SITEMAP_KEY = "meta/sitemap.json"
+SIDEBAR_PATH = Path(__file__).parent.parent / "sidebar.html"
+
+
+# --- Auth ---------------------------------------------------------------
+
+@router.get("/me")
+def me(username: str = Depends(get_current_user)):
+    return {"username": username}
+
+
+# --- Sitemap ------------------------------------------------------------
+
+def _bare_key(key: str) -> str:
+    """Normalize a sitemap key to its extensionless form.
+
+    `index.html` and `*/index.html` are preserved (they're directory roots,
+    and an empty dict key would be confusing).
+    """
+    if key == "index.html" or key.endswith("/index.html"):
+        return key
+    if key.endswith(".html"):
+        return key[: -len(".html")]
+    return key
+
+
+def _bucket_key(key: str) -> str:
+    """Map a sitemap key to its bucket object name (always ends in .html)."""
+    return key if key.endswith(".html") else f"{key}.html"
+
+
+def _load_sitemap() -> dict[str, Any]:
+    try:
+        raw = bucket.get_bytes(SITEMAP_KEY)
+    except ClientError as e:
+        if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
+            return {}
+        raise
+    data = json.loads(raw)
+    # Legacy: keys may include `.html`. Normalize to bare form on read.
+    return {_bare_key(k): v for k, v in data.items()}
+
+
+@router.get("/sitemap")
+def get_sitemap(username: str = Depends(get_current_user)):
+    sitemap = _load_sitemap()
+    pages = {}
+    for path, page in sitemap.items():
+        md = page.get("md", "") or ""
+        html = palimpsest.generator.markdown2html(md) if md else ""
+        # Rewrite legacy relative image paths (e.g. ../sites/pa-f.net/files/x.jpg)
+        # to absolute (/sites/pa-f.net/files/x.jpg). This is the same form
+        # palimpsest.generator.images_from_root produces on output, and the only
+        # form that works for both the prod /editor/ mount and the Vite dev server.
+        html = palimpsest.generator.images_from_root(html)
+        def _s(v):
+            return v if isinstance(v, str) else ""
+        pages[path] = {
+            "title": _s(page.get("title", "")),
+            "date": _s(page.get("date", "")),
+            "image": _s(page.get("image", "")),
+            "html": html,
+        }
+    return {"pages": pages}
+
+
+class PageIn(BaseModel):
+    title: str = ""
+    date: str = ""
+    image: str = ""
+    html: str = ""
+
+
+class SitemapIn(BaseModel):
+    pages: dict[str, PageIn]
+    rename_map: dict[str, str] = {}  # new_path -> old_path
+
+
+def _archive_key() -> str:
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"meta/archive/sitemap-{ts}.json"
+
+
+def _convert_pages_to_md(payload: SitemapIn, prior: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for path, page in payload.pages.items():
+        md = html_to_md(page.html or "", heading_style="ATX").strip() + "\n"
+        # For renames, look up the page's original key so pass-through fields
+        # (e.g. `links`) follow it.
+        lookup = payload.rename_map.get(path, path)
+        existing = prior.get(lookup, {})
+        merged = dict(existing)
+        merged.update(
+            title=page.title,
+            date=page.date,
+            image=page.image,
+            md=md,
+        )
+        out[path] = merged
+    return out
+
+
+def _regenerate_and_upload(sitemap: dict[str, Any]):
+    # Sitemap keys are bare (extensionless); the generator writes one file per
+    # key, and bucket object names need to keep the .html suffix.
+    gen_sitemap = {_bucket_key(k): v for k, v in sitemap.items()}
+    with tempfile.TemporaryDirectory() as tdir:
+        ssg = palimpsest.StaticSiteGenerator(gen_sitemap, output_dir=tdir)
+        if SIDEBAR_PATH.exists():
+            ssg.load_sidebar(str(SIDEBAR_PATH))
+        ssg.generate_site()
+
+        for root, _dirs, files in os.walk(tdir):
+            for fname in files:
+                if not fname.endswith(".html"):
+                    continue
+                full = os.path.join(root, fname)
+                rel = os.path.relpath(full, tdir)
+                bucket.upload_file(full, rel, content_type="text/html")
+
+
+@router.put("/sitemap")
+def put_sitemap(payload: SitemapIn, username: str = Depends(get_current_user)):
+    prior = _load_sitemap()
+    new_sitemap = _convert_pages_to_md(payload, prior)
+
+    # Paths that existed before but are gone now (deletes + the source side of renames).
+    delete_paths = set(prior) - set(new_sitemap)
+
+    # Archive the prior sitemap (if it exists) before overwriting
+    if prior:
+        try:
+            bucket.copy_object(SITEMAP_KEY, _archive_key())
+        except ClientError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to archive prior sitemap: {e}")
+
+    # Write the new sitemap
+    bucket.put_object(
+        SITEMAP_KEY,
+        json.dumps(new_sitemap, indent=2).encode("utf-8"),
+        content_type="application/json",
+    )
+
+    # Regenerate the static HTML and overwrite the live site
+    _regenerate_and_upload(new_sitemap)
+
+    # Clean up generated HTML for pages that no longer exist (renamed-from or deleted).
+    deleted = []
+    for path in delete_paths:
+        try:
+            bucket.delete_object(_bucket_key(path))
+            deleted.append(path)
+        except ClientError:
+            pass  # Already gone or never existed; not worth failing the save.
+
+    return {
+        "ok": True,
+        "page_count": len(new_sitemap),
+        "deleted_paths": deleted,
+    }
+
+
+# --- File upload --------------------------------------------------------
+
+_safe_slug_re = re.compile(r"[^a-z0-9]+")
+
+
+def _slug(s: str) -> str:
+    return _safe_slug_re.sub("-", s.lower()).strip("-")[:40]
+
+
+@router.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    caption: str = Form(""),
+    username: str = Depends(get_current_user),
+):
+    body = await file.read()
+    if not body:
+        raise HTTPException(status_code=400, detail="Empty file")
+
+    suffix = Path(file.filename or "").suffix.lower()
+    stem_hint = _slug(Path(file.filename or "").stem) or "file"
+    name = f"{stem_hint}-{uuid.uuid4().hex[:8]}{suffix}"
+    key = f"sites/pa-f.net/files/{name}"
+    content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    bucket.put_object(key, body, content_type=content_type)
+    return {"url": f"/{key}", "caption": caption}
