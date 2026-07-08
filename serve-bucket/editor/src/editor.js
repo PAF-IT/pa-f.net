@@ -77,6 +77,16 @@ function pickImageFile() {
   });
 }
 
+function pickAnyFile() {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.onchange = () => resolve(input.files?.[0] || null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
 // ---------- Access ----------
 
 function showDenied() { $('#app-pane').hidden = true; $('#denied-pane').hidden = false; }
@@ -147,7 +157,11 @@ function initQuill() {
     modules: {
       toolbar: {
         container: '#quill-toolbar',
-        handlers: { image: insertNewImageHandler, link: handleLinkInsertion },
+        handlers: {
+          image: insertNewImageHandler,
+          link: handleLinkInsertion,
+          attach: insertNewFileHandler,
+        },
       },
     },
   });
@@ -440,6 +454,24 @@ async function insertNewImageHandler() {
     const data = await uploadFile(file, caption);
     insertImageAtCursor(data.url, data.caption || caption);
     toast('Image uploaded.');
+  } catch (err) {
+    toast(`Upload failed: ${err.message}`, true);
+  }
+}
+
+// ---------- File attachment insertion (toolbar) ----------
+
+async function insertNewFileHandler() {
+  const file = await pickAnyFile();
+  if (!file) return;
+  toast('Uploading…');
+  try {
+    const data = await uploadFile(file);
+    const range = state.quill.getSelection(true);
+    const index = range ? range.index : state.quill.getLength();
+    state.quill.insertText(index, file.name, { link: data.url }, 'user');
+    state.quill.setSelection(index + file.name.length, 0);
+    toast('File uploaded.');
   } catch (err) {
     toast(`Upload failed: ${err.message}`, true);
   }

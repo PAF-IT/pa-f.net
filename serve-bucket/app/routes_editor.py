@@ -1,4 +1,5 @@
 import json
+import mimetypes
 import os
 import re
 import tempfile
@@ -22,15 +23,6 @@ router = APIRouter(prefix="/api/editor")
 
 SITEMAP_KEY = "meta/sitemap.json"
 SIDEBAR_PATH = Path(__file__).parent.parent / "sidebar.html"
-
-IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp"}
-IMAGE_CONTENT_TYPES = {
-    "jpg": "image/jpeg",
-    "jpeg": "image/jpeg",
-    "png": "image/png",
-    "gif": "image/gif",
-    "webp": "image/webp",
-}
 
 
 # --- Auth ---------------------------------------------------------------
@@ -191,7 +183,7 @@ def put_sitemap(payload: SitemapIn, username: str = Depends(get_current_user)):
     }
 
 
-# --- Image upload -------------------------------------------------------
+# --- File upload --------------------------------------------------------
 
 _safe_slug_re = re.compile(r"[^a-z0-9]+")
 
@@ -201,20 +193,19 @@ def _slug(s: str) -> str:
 
 
 @router.post("/upload")
-async def upload_image(
+async def upload_file(
     file: UploadFile = File(...),
     caption: str = Form(""),
     username: str = Depends(get_current_user),
 ):
-    ext = (file.filename or "").rsplit(".", 1)[-1].lower()
-    if ext not in IMAGE_EXTS:
-        raise HTTPException(status_code=400, detail=f"Unsupported extension: {ext}")
     body = await file.read()
     if not body:
         raise HTTPException(status_code=400, detail="Empty file")
 
-    stem_hint = _slug(Path(file.filename or "").stem) or "image"
-    name = f"{stem_hint}-{uuid.uuid4().hex[:8]}.{ext}"
+    suffix = Path(file.filename or "").suffix.lower()
+    stem_hint = _slug(Path(file.filename or "").stem) or "file"
+    name = f"{stem_hint}-{uuid.uuid4().hex[:8]}{suffix}"
     key = f"sites/pa-f.net/files/{name}"
-    bucket.put_object(key, body, content_type=IMAGE_CONTENT_TYPES[ext])
+    content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    bucket.put_object(key, body, content_type=content_type)
     return {"url": f"/{key}", "caption": caption}
