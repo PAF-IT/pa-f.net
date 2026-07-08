@@ -73,5 +73,4 @@ jobs:
           UPCLOUD_OBJ_ENDPOINT: ${{ secrets.UPCLOUD_OBJ_ENDPOINT }}
           UPCLOUD_OBJ_ID: ${{ secrets.UPCLOUD_OBJ_ID }}
           UPCLOUD_OBJ_SECRET: ${{ secrets.UPCLOUD_OBJ_SECRET }}
-          JWT_SECRET: ${{ secrets.PAF_DOT_NET_JWT_SECRET }}
           BUCKET_NAME: pa-f.net
